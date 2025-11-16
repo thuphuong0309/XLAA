@@ -124,6 +124,39 @@ canvas{
     .main-layout{flex-direction:column;}
     .left-panel,.right-panel{max-width:none;}
 }
+
+#stepsList {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* 5 ảnh trên 1 hàng */
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.step-box {
+    text-align: left; /* căn trái tiêu đề */
+    background: #fafafa;
+    padding: 6px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+}
+
+.step-img {
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+.step-title {
+    margin-bottom: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left; /* căn trái */
+}
+
+
+
+
 </style>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -177,10 +210,10 @@ canvas{
                 </div>
             </div>
 
-            <div class="card" id="stepsContainer" style="display:none;">
+             <div class="card" id="stepsContainerr" style="display:none;"> 
                 <h3>📌 Các bước xử lý</h3>
-                <div id="stepsList"></div>
-            </div>
+                <div id="stepsListt"></div>
+            </div> 
 
             <div class="card" id="lettersContainer" style="display:none;">
                 <h3>✉️ Chữ/Số đã tách (<span id="letterCount">0</span>)</h3>
@@ -194,7 +227,13 @@ canvas{
                <canvas id="draw-canvas" width="900" height="600"></canvas>
                <p style="font-size:0.9em; color:#6c757d;">(Vẽ trực tiếp hoặc ảnh upload)</p>
            </div>
+           
         </div>
+    </div>
+     <!-- Steps dưới Canvas -->
+    <div class="card" id="stepsContainer" style="display:none; margin-top:16px">
+           <h3>📌 Các bước xử lý</h3>
+           <div id="stepsList"></div>
     </div>
 </div>
 
@@ -508,8 +547,10 @@ function renderSteps(steps){
 
     steps.forEach(s => {
         list.innerHTML += `
+        <div class="step-box">
             <p><b>${s.title}</b></p>
             <img src="/static/${s.file}?t=${timestamp}" class="step-img">
+            </div>
         `;
     });
 }
@@ -545,6 +586,8 @@ function renderLetters(letters, predictions){
         `;
     });
 }
+
+
 </script>
 </body>
 </html>
