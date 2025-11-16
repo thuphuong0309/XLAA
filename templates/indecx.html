@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Creative Image Recognition Tool</title>
+<style>
+body {
+    margin:0;
+    font-family:'Poppins',sans-serif;
+    background:#fff;
+    color:#333;
+}
+.container{
+    max-width:1200px;
+    margin:auto;
+    padding:20px 30px;
+}
+h1{
+    text-align:center;
+    margin-bottom:25px;
+    font-size:2.2em;
+    font-weight:700;
+}
+.mode-buttons{
+    display:flex;
+    justify-content:center;
+    gap:15px;
+    margin-bottom:20px;
+}
+.mode-buttons button{
+    padding:12px 20px;
+    border-radius:10px;
+    border:2px solid #6c757d;
+    background:#f8f9fa;
+    color:#343a40;
+    font-size:16px;
+    font-weight:600;
+    cursor:pointer;
+    transition:0.3s;
+}
+.mode-buttons button.active{
+    background:#2575fc;
+    color:#fff;
+    border-color:#2575fc;
+}
+.main-layout{
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+}
+.left-panel{
+    flex:1;
+    min-width:260px;
+    max-width:350px;
+}
+.right-panel{
+    flex:2;
+}
+.card{
+    background:#fff;
+    padding:20px;
+    border-radius:10px;
+    margin-bottom:20px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+.btn-action{
+    width:100%;
+    padding:12px;
+    margin-top:10px;
+    border:none;
+    border-radius:8px;
+    background:#2575fc;
+    color:#fff;
+    font-size:1em;
+    font-weight:600;
+    cursor:pointer;
+    transition:0.3s;
+}
+.btn-action:hover{background:#1a5ed0;}
+.btn-action:disabled{background:#ccc; cursor:not-allowed;}
+canvas{
+    border:1px solid #ccc;
+    border-radius:6px;
+    background:#ffffff;
+    width:100%;
+    max-width:900px;
+    height:auto;
+    cursor: crosshair;
+}
+.mode-section{display:none;}
+.step-img{
+    width:100%;
+    border:1px solid #ccc;
+    margin-top:10px;
+    border-radius:6px;
+}
+.letter-box{
+    display:inline-block;
+    text-align:center;
+    margin:5px;
+    padding:5px;
+    border:2px solid #ddd;
+    border-radius:6px;
+    background:#f9f9f9;
+}
+.letter-img{
+    width:60px;
+    height:60px;
+    border:1px solid #ccc;
+    border-radius:4px;
+    background:white;
+}
+.confidence{
+    font-size:0.8em;
+    color:#666;
+}
+.loading{
+    text-align:center;
+    color:#2575fc;
+    font-weight:600;
+}
+@media (max-width:768px){
+    .main-layout{flex-direction:column;}
+    .left-panel,.right-panel{max-width:none;}
+}
+</style>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+<div class="container">
+    <h1>✨ Creative Image Recognition Tool</h1>
+
+    <div class="mode-buttons">
+        <button data-mode="upload">Upload Image</button>
+        <button data-mode="draw">Vẽ Canvas</button>
+        <button data-mode="roi">Chọn ROI</button>
+    </div>
+
+    <div class="main-layout">
+        <div class="left-panel">
+            <div class="card">
+                <h3>🛠️ Tham số & Xử lý</h3>
+
+                <div class="mode-section" id="uploadSection">
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <input type="file" id="imageInput" name="image" accept="image/*" style="width:100%; margin-bottom:10px;"><br>
+                        <button type="submit" class="btn-action">Xử lý & Dự đoán</button>
+                    </form>
+                </div>
+
+                <div class="mode-section" id="drawSection">
+                    <p>Vẽ trực tiếp trên canvas</p>
+                    <button class="btn-action" id="clearDrawBtn">Xóa Canvas</button>
+                    <button class="btn-action" id="processDrawBtn">Xử lý & Dự đoán</button>
+                </div>
+
+                <div class="mode-section" id="roiSection">
+                    <p>📌 Upload ảnh & chọn vùng ROI</p>
+                    <input type="file" id="roiImageInput" accept="image/*" style="width:100%; margin-bottom:10px;">
+                    <button class="btn-action" id="processRoiBtn">Xử lý & Dự đoán vùng chọn</button>
+                </div>
+            </div>
+
+            <div class="card" id="stepsContainer" style="display:none;">
+                <h3>📌 Các bước xử lý</h3>
+                <div id="stepsList"></div>
+            </div>
+
+            <div class="card" id="lettersContainer" style="display:none;">
+                <h3>✉️ Chữ/Số đã tách (<span id="letterCount">0</span>)</h3>
+                <div id="lettersList"></div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+           <div class="card">
+               <h3>🖼️ Canvas Hiển thị / Vẽ trực tiếp</h3>
+               <canvas id="draw-canvas" width="900" height="600"></canvas>
+               <p style="font-size:0.9em; color:#6c757d;">(Vẽ trực tiếp hoặc ảnh upload)</p>
+           </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- Mode & Section ---
+const modeButtons = document.querySelectorAll('.mode-buttons button');
+const sections = {
+    upload: document.getElementById('uploadSection'),
+    draw: document.getElementById('drawSection'),
+    roi: document.getElementById('roiSection')
+};
+let currentMode = 'upload';
+
+function switchMode(mode){
+    modeButtons.forEach(b => b.classList.remove('active'));
+    document.querySelector(`.mode-buttons button[data-mode="${mode}"]`).classList.add('active');
+    for(const k in sections){
+        sections[k].style.display = (k === mode) ? 'block' : 'none';
+    }
+    currentMode = mode;
+    clearResults(); // ✅ Xóa kết quả khi đổi mode
+}
+modeButtons.forEach(btn => btn.addEventListener('click', () => switchMode(btn.dataset.mode)));
+document.addEventListener('DOMContentLoaded', () => switchMode('upload'));
+
+// --- Canvas ---
+const canvas = document.getElementById('draw-canvas');
+const ctx = canvas.getContext('2d');
+
+function clearCanvas(){
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+clearCanvas();
+
+// --- Vẽ trực tiếp ---
+let isDrawing = false, lastX=0, lastY=0;
+
+canvas.addEventListener('mousedown', e => {
+    if(currentMode !== 'draw') return;
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    lastX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    lastY = (e.clientY - rect.top) * (canvas.height / rect.height);
+});
+canvas.addEventListener('mousemove', e => {
+    if(!isDrawing || currentMode !== 'draw') return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    ctx.beginPath();
+    ctx.moveTo(lastX,lastY);
+    ctx.lineTo(x,y);
+    ctx.strokeStyle='black';
+    ctx.lineWidth=14;
+    ctx.lineCap='round';
+    ctx.lineJoin='round';
+    ctx.stroke();
+    lastX=x; lastY=y;
+});
+canvas.addEventListener('mouseup', ()=>isDrawing=false);
+canvas.addEventListener('mouseleave', ()=>isDrawing=false);
+
+// Touch events
+canvas.addEventListener('touchstart', e => {
+    if(currentMode !== 'draw') return;
+    e.preventDefault();
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    lastX = (e.touches[0].clientX - rect.left) * (canvas.width / rect.width);
+    lastY = (e.touches[0].clientY - rect.top) * (canvas.height / rect.height);
+});
+canvas.addEventListener('touchmove', e => {
+    if(!isDrawing || currentMode !== 'draw') return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches[0].clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.touches[0].clientY - rect.top) * (canvas.height / rect.height);
+    ctx.beginPath();
+    ctx.moveTo(lastX,lastY);
+    ctx.lineTo(x,y);
+    ctx.strokeStyle='black';
+    ctx.lineWidth=14;
+    ctx.lineCap='round';
+    ctx.lineJoin='round';
+    ctx.stroke();
+    lastX=x; lastY=y;
+});
+canvas.addEventListener('touchend', ()=>isDrawing=false);
+canvas.addEventListener('touchcancel', ()=>isDrawing=false);
+
+// --- Xóa canvas ---
+document.getElementById('clearDrawBtn').addEventListener('click', clearCanvas);
+
+// --- Upload ảnh hiển thị ---
+const uploadInput = document.getElementById('imageInput');
+uploadInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+            clearCanvas();
+            const scale = Math.min(canvas.width/img.width, canvas.height/img.height);
+            const x = (canvas.width - img.width*scale)/2;
+            const y = (canvas.height - img.height*scale)/2;
+            ctx.drawImage(img,x,y,img.width*scale,img.height*scale);
+        };
+        img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+
+// --- ROI ---
+const roiInput = document.getElementById('roiImageInput');
+let roiImage = new Image(), roiDrawing=false, roiStart={x:0,y:0}, roiRect=null;
+
+roiInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        roiImage.onload = () => {
+            clearCanvas();
+            const scale = Math.min(canvas.width/roiImage.width, canvas.height/roiImage.height);
+            const x = (canvas.width - roiImage.width*scale)/2;
+            const y = (canvas.height - roiImage.height*scale)/2;
+            ctx.drawImage(roiImage,x,y,roiImage.width*scale,roiImage.height*scale);
+            roiRect = null; // Reset ROI
+        };
+        roiImage.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+
+// Chọn ROI
+canvas.addEventListener('mousedown', e => {
+    if(currentMode!=='roi') return;
+    roiDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    roiStart = {
+        x: (e.clientX - rect.left) * (canvas.width / rect.width),
+        y: (e.clientY - rect.top) * (canvas.height / rect.height)
+    };
+});
+canvas.addEventListener('mousemove', e => {
+    if(!roiDrawing || currentMode!=='roi') return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    roiRect = {
+        x: Math.min(roiStart.x,x),
+        y: Math.min(roiStart.y,y),
+        w: Math.abs(x-roiStart.x),
+        h: Math.abs(y-roiStart.y)
+    };
+    // Vẽ lại ảnh + khung ROI
+    clearCanvas();
+    const scale = Math.min(canvas.width/roiImage.width, canvas.height/roiImage.height);
+    const imgX = (canvas.width - roiImage.width*scale)/2;
+    const imgY = (canvas.height - roiImage.height*scale)/2;
+    ctx.drawImage(roiImage,imgX,imgY,roiImage.width*scale,roiImage.height*scale);
+    if(roiRect){
+        ctx.strokeStyle='red';
+        ctx.lineWidth=2;
+        ctx.strokeRect(roiRect.x,roiRect.y,roiRect.w,roiRect.h);
+    }
+});
+canvas.addEventListener('mouseup', ()=>roiDrawing=false);
+canvas.addEventListener('mouseleave', ()=>roiDrawing=false);
+
+// --- Loading indicator ---
+function showLoading(button) {
+    button.disabled = true;
+    button.textContent = '⏳ Đang xử lý...';
+}
+
+function hideLoading(button, text) {
+    button.disabled = false;
+    button.textContent = text;
+}
+
+// --- Clear results ---
+function clearResults() {
+    document.getElementById('stepsContainer').style.display = 'none';
+    document.getElementById('lettersContainer').style.display = 'none';
+    document.getElementById('stepsList').innerHTML = '';
+    document.getElementById('lettersList').innerHTML = '';
+    document.getElementById('letterCount').textContent = '0';
+}
+
+// --- Backend & nút xử lý ---
+document.getElementById("uploadForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const file = uploadInput.files[0];
+    if (!file) return alert("Chưa chọn ảnh!");
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    showLoading(submitBtn);
+    clearResults(); // ✅ Xóa kết quả cũ
+
+    try {
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const res = await fetch("/process", {
+            method: "POST",
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (data.error) {
+            alert("Lỗi: " + data.error);
+        } else {
+            renderSteps(data.steps);
+            renderLetters(data.letters, data.predictions);
+        }
+    } catch(error) {
+        alert("Lỗi kết nối: " + error.message);
+    } finally {
+        hideLoading(submitBtn, 'Xử lý & Dự đoán');
+    }
+});
+
+document.getElementById("processDrawBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("processDrawBtn");
+    showLoading(btn);
+    clearResults(); // ✅ Xóa kết quả cũ
+
+    try {
+        const base64 = canvas.toDataURL("image/png");
+
+        const res = await fetch("/process", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                mode: "draw",
+                image: base64
+            })
+        });
+        const data = await res.json();
+        
+        if (data.error) {
+            alert("Lỗi: " + data.error);
+        } else {
+            renderSteps(data.steps);
+            renderLetters(data.letters, data.predictions);
+        }
+    } catch(error) {
+        alert("Lỗi kết nối: " + error.message);
+    } finally {
+        hideLoading(btn, 'Xử lý & Dự đoán');
+    }
+});
+
+document.getElementById("processRoiBtn").addEventListener("click", async () => {
+    if (!roiRect) return alert("Chưa chọn ROI!");
+
+    const btn = document.getElementById("processRoiBtn");
+    showLoading(btn);
+    clearResults(); // ✅ Xóa kết quả cũ
+
+    try {
+        const cropCanvas = document.createElement("canvas");
+        cropCanvas.width = roiRect.w;
+        cropCanvas.height = roiRect.h;
+        const cropCtx = cropCanvas.getContext("2d");
+
+        cropCtx.drawImage(
+            canvas,
+            roiRect.x, roiRect.y, roiRect.w, roiRect.h,
+            0, 0, roiRect.w, roiRect.h
+        );
+
+        const base64 = cropCanvas.toDataURL("image/png");
+
+        const res = await fetch("/process", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                mode: "roi",
+                image: base64
+            })
+        });
+        const data = await res.json();
+        
+        if (data.error) {
+            alert("Lỗi: " + data.error);
+        } else {
+            renderSteps(data.steps);
+            renderLetters(data.letters, data.predictions);
+        }
+    } catch(error) {
+        alert("Lỗi kết nối: " + error.message);
+    } finally {
+        hideLoading(btn, 'Xử lý & Dự đoán vùng chọn');
+    }
+});
+
+function renderSteps(steps){
+    const box = document.getElementById("stepsContainer");
+    const list = document.getElementById("stepsList");
+    box.style.display = "block";
+    list.innerHTML = "";
+
+    const timestamp = new Date().getTime(); // ✅ Thêm timestamp để bypass cache
+
+    steps.forEach(s => {
+        list.innerHTML += `
+            <p><b>${s.title}</b></p>
+            <img src="/static/${s.file}?t=${timestamp}" class="step-img">
+        `;
+    });
+}
+
+function renderLetters(letters, predictions){
+    const box = document.getElementById("lettersContainer");
+    const list = document.getElementById("lettersList");
+    const count = document.getElementById("letterCount");
+    
+    box.style.display = "block";
+    list.innerHTML = "";
+    count.textContent = letters.length;
+
+    const timestamp = new Date().getTime();
+    
+    console.log('🔍 Render letters:', letters); // ✅ Debug log
+    console.log('🔍 Timestamp:', timestamp);
+
+    letters.forEach((filename, i) => {
+        const pred = predictions[i];
+        const label = pred.label || pred;
+        const confidence = pred.confidence ? (pred.confidence * 100).toFixed(1) + '%' : '';
+        
+        const imgUrl = `/static/letters/${filename}?t=${timestamp}`;
+        console.log(`📷 Loading image: ${imgUrl}`); // ✅ Debug log
+        
+        list.innerHTML += `
+            <div class="letter-box">
+                <img src="${imgUrl}" class="letter-img" alt="${label}" onerror="console.error('❌ Failed to load:', this.src)">
+                <div style="font-weight:bold; color:#2575fc; margin-top:5px;">${label}</div>
+                ${confidence ? `<div class="confidence">${confidence}</div>` : ''}
+            </div>
+        `;
+    });
+}
+</script>
+</body>
+</html>
