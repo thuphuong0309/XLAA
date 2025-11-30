@@ -32,7 +32,27 @@ LABELS = ['0','1','2','3','4','5','6','7','8','9',
           'I','J','K','L','M','N','O','P','Q','R',
           'S','square','T','triangle','U','V','W','X','Y','Z']
 
-# --- HÀM TIỀN XỬ LÝ ẢNH MỖI KÝ TỰ (ĐÃ SỬA) ---
+# --- HÀM LẤY TOP N DỰ ĐOÁN ---
+def get_top_predictions(predictions, top_n=5):
+    """
+    Lấy top N dự đoán có xác suất cao nhất
+    predictions: array xác suất từ model (shape: (num_classes,))
+    top_n: số lượng dự đoán muốn lấy
+    return: list các dict {"label": str, "confidence": float}
+    """
+    # Lấy indices của top_n giá trị cao nhất
+    top_indices = np.argsort(predictions)[-top_n:][::-1]
+    
+    top_results = []
+    for idx in top_indices:
+        top_results.append({
+            "label": LABELS[idx],
+            "confidence": float(predictions[idx])
+        })
+    
+    return top_results
+
+# --- HÀM TIỀN XỬ LÝ ẢNH MỖI KÝ TỰ ---
 def preprocessing_for_prediction(crop_binary, out_size=(64, 64), pad=10):
     """
     Tiền xử lý ảnh một ký tự ĐÃ BINARY để model dự đoán.
@@ -55,8 +75,8 @@ def preprocessing_for_prediction(crop_binary, out_size=(64, 64), pad=10):
     tight_crop = crop_binary[y:y+h, x:x+w]
     
     # 4. Thêm padding
-    pad_h = int(h * 0.2)  # 20% chiều cao
-    pad_w = int(w * 0.2)  # 20% chiều rộng
+    pad_h = int(h * 0.3)  # 25% chiều cao
+    pad_w = int(w * 0.3)  # 25% chiều rộng
     padded = cv2.copyMakeBorder(
         tight_crop, 
         pad_h, pad_h, pad_w, pad_w,
@@ -94,29 +114,24 @@ def sort_contours_by_line(contours):
     
     # Nhóm các contours thành dòng
     lines = []
-    contours_sorted_by_y = sorted(contours, key=lambda c: c[1])  # Sắp theo Y trước
+    contours_sorted_by_y = sorted(contours, key=lambda c: c[1])
     
     current_line = [contours_sorted_by_y[0]]
     current_y = contours_sorted_by_y[0][1]
     
     for cont in contours_sorted_by_y[1:]:
         x, y, w, h, cnt = cont
-        # Nếu Y gần với dòng hiện tại (chênh lệch < avg_height/2)
         if abs(y - current_y) < avg_height / 2:
             current_line.append(cont)
         else:
-            # Sắp xếp dòng hiện tại theo X (trái → phải)
             current_line.sort(key=lambda c: c[0])
             lines.append(current_line)
-            # Bắt đầu dòng mới
             current_line = [cont]
             current_y = y
     
-    # Thêm dòng cuối
     current_line.sort(key=lambda c: c[0])
     lines.append(current_line)
     
-    # Gộp tất cả dòng lại
     result = []
     for line in lines:
         result.extend(line)
@@ -171,144 +186,115 @@ def process():
     cv2.imwrite(f"{STATIC_FOLDER}/step_blur.png", blur)
     steps.append({"title": "Gaussian Blur", "file": "step_blur.png"})
 
-    # ---- Step 3: Threshold (thử 2 phương pháp) ----
-    # Phương pháp 1: Otsu (tốt cho ảnh đồng đều)
+    # ---- Step 3: Threshold ----
     _, th_otsu = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     cv2.imwrite(f"{STATIC_FOLDER}/step_thresh_otsu.png", th_otsu)
     steps.append({"title": "Threshold (Otsu)", "file": "step_thresh_otsu.png"})
     
-    # Phương pháp 2: Adaptive (tốt cho ánh sáng không đều)
     th_adaptive = cv2.adaptiveThreshold(
         blur, 255, 
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
         cv2.THRESH_BINARY_INV, 
-        blockSize=21,  # Kích thước vùng xét (càng lớn càng mượt)
-        C=10           # Hằng số trừ đi (điều chỉnh độ nhạy)
+        blockSize=21,
+        C=10
     )
     cv2.imwrite(f"{STATIC_FOLDER}/step_thresh_adaptive.png", th_adaptive)
     steps.append({"title": "Threshold (Adaptive)", "file": "step_thresh_adaptive.png"})
     
-    #Phương pháp 3: Kết hợp 2 phương pháp: lấy giao (AND)
     th_combined = cv2.bitwise_or(th_otsu, th_adaptive)
     cv2.imwrite(f"{STATIC_FOLDER}/step_thresh_combined.png", th_combined)
     steps.append({"title": "Threshold (Combined)", "file": "step_thresh_combined.png"})
     
-    # ---- Step 3.5: Morphology để làm sạch ----
+    # ---- Step 3.5: Morphology ----
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    # Closing: lấp đầy lỗ trong ký tự
     th_morphed = cv2.morphologyEx(th_combined, cv2.MORPH_CLOSE, kernel, iterations=1)
-    # Opening: loại bỏ nhiễu nhỏ
     th_morphed = cv2.morphologyEx(th_morphed, cv2.MORPH_OPEN, kernel, iterations=1)
     cv2.imwrite(f"{STATIC_FOLDER}/step_morphology.png", th_morphed)
     steps.append({"title": "Morphology (Clean)", "file": "step_morphology.png"})
     
-    # ---- Step 3.6: Canny Edge Detection ----
-    # Áp dụng Canny trên ảnh blur
+    # ---- Step 3.6: Canny Edge ----
     edges = cv2.Canny(blur, threshold1=50, threshold2=150)
-    # Dilate để nối các cạnh gần nhau
     kernel_canny = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
     edges_dilated = cv2.dilate(edges, kernel_canny, iterations=2)
-    # Closing để lấp đầy
     edges_closed = cv2.morphologyEx(edges_dilated, cv2.MORPH_CLOSE, kernel_canny, iterations=2)
     cv2.imwrite(f"{STATIC_FOLDER}/step_canny.png", edges_closed)
     steps.append({"title": "Canny Edge Detection", "file": "step_canny.png"})
     
-    # Chọn ảnh threshold để PHÁT HIỆN contours
+    # Chọn ảnh threshold
     if threshold_method == "otsu":
         th_detect = th_otsu
-        print("✅ Dùng Otsu để phát hiện")
     elif threshold_method == "adaptive":
         th_detect = th_adaptive
-        print("✅ Dùng Adaptive để phát hiện")
     elif threshold_method == "canny":
         th_detect = edges_closed
-        print("✅ Dùng Canny Edge để phát hiện")
-    else:  # combined
+    else:
         th_detect = th_morphed
-        print("✅ Dùng Combined để phát hiện")
     
-    # QUAN TRỌNG: Luôn dùng Otsu để crop ký tự (cho model dự đoán)
     th_for_crop = th_otsu
-    print("✅ Dùng Otsu để crop ký tự (model dự đoán tốt hơn)")
 
-    # ---- Step 4: Tách ký tự (dùng th_detect) ----
+    # ---- Step 4: Tách ký tự ----
     contours, _ = cv2.findContours(th_detect, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    # Lọc contours quá nhỏ hoặc quá lớn
     filtered_contours = []
     img_area = th_detect.shape[0] * th_detect.shape[1]
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
         area = w * h
-        # Bỏ qua contour quá nhỏ (<1% ảnh) hoặc quá lớn (>80% ảnh)
         if area > img_area * 0.01 and area < img_area * 0.8:
-            if w > 10 and h > 10:  # Kích thước tối thiểu
+            if w > 10 and h > 10:
                 filtered_contours.append((x, y, w, h, cnt))
     
-    # ---- Sắp xếp theo dòng (trên → dưới) rồi trái → phải ----
     filtered_contours = sort_contours_by_line(filtered_contours)
     
-    # ---- Vẽ bounding boxes lên ảnh gốc ----
     img_with_boxes = cv_img.copy()
     for idx, (x, y, w, h, cnt) in enumerate(filtered_contours):
-        # Vẽ khung chữ nhật màu xanh lá
         cv2.rectangle(img_with_boxes, (x, y), (x+w, y+h), (0, 255, 0), 3)
-        # Vẽ số thứ tự góc trên bên trái
         cv2.putText(img_with_boxes, f"#{idx}", (x, y-10), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
     
     cv2.imwrite(f"{STATIC_FOLDER}/step_boxes.png", img_with_boxes)
     steps.append({"title": "Detected Characters", "file": "step_boxes.png"})
     
-    # Lưu ảnh threshold được dùng để phát hiện
     cv2.imwrite(f"{STATIC_FOLDER}/step_thresh_used.png", th_detect)
     steps.append({"title": f"Threshold Used ({threshold_method.upper()})", "file": "step_thresh_used.png"})
 
-    # ---- Xóa files cũ trong thư mục letters ----
+    # ---- Xóa files cũ ----
     if os.path.exists(LETTER_FOLDER):
         for filename in os.listdir(LETTER_FOLDER):
             file_path = os.path.join(LETTER_FOLDER, filename)
             try:
                 if os.path.isfile(file_path):
                     os.unlink(file_path)
-                    print(f"🗑️ Đã xóa: {file_path}")
             except Exception as e:
                 print(f"⚠️ Không thể xóa {file_path}: {e}")
     else:
         os.makedirs(LETTER_FOLDER, exist_ok=True)
-    
-    print(f"✅ Thư mục letters đã sạch: {LETTER_FOLDER}")
 
     # ---- Step 5: Xử lý từng ký tự ----
     for idx, (x, y, w, h, cnt) in enumerate(filtered_contours):
-        # Crop từ ảnh Otsu (cho model dự đoán tốt hơn)
         crop = th_for_crop[y:y+h, x:x+w]
-
-        # Tiền xử lý
         processed = preprocessing_for_prediction(crop)
 
-        # Lưu ảnh để hiển thị
         save_path = os.path.join(LETTER_FOLDER, f"letter_{idx}.png")
         cv2.imwrite(save_path, (processed.squeeze() * 255))
-        print(f"💾 Đã lưu: {save_path}")
 
-        # ✅ FIX: Trả về tên file thôi, không có "letters/"
         letters.append(f"letter_{idx}.png")
 
-        # Dự đoán
+        # Dự đoán và lấy top 5
         inp = np.expand_dims(processed, axis=0)
-        pred = model.predict(inp, verbose=0)
-        class_index = np.argmax(pred)
-        confidence = pred[0][class_index]
+        pred = model.predict(inp, verbose=0)[0]  # Lấy array xác suất
         
-        # Thêm confidence để debug
+        # Lấy top 5 dự đoán
+        top_preds = get_top_predictions(pred, top_n=5)
+        
         predictions.append({
-            "label": LABELS[class_index],
-            "confidence": float(confidence)
+            "top_prediction": top_preds[0]["label"],  # Dự đoán cao nhất
+            "confidence": top_preds[0]["confidence"],
+            "top_5": top_preds  # Danh sách top 5
         })
 
-    print(f"📊 Tổng số ký tự phát hiện: {len(letters)}")
-    print(f"🎯 Dự đoán: {[p['label'] if isinstance(p, dict) else p for p in predictions]}")
+    print(f"📊 Tổng số ký tự: {len(letters)}")
+    print(f"🎯 Top predictions: {[p['top_prediction'] for p in predictions]}")
     
     return jsonify({
         "steps": steps,

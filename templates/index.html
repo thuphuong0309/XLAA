@@ -95,26 +95,94 @@ canvas{
     margin-top:10px;
     border-radius:6px;
 }
+
+/* ===== Letter Box với Top 5 ===== */
 .letter-box{
     display:inline-block;
-    text-align:center;
-    margin:5px;
-    padding:5px;
+    vertical-align:top;
+    margin:8px;
+    padding:12px;
     border:2px solid #ddd;
-    border-radius:6px;
+    border-radius:10px;
     background:#f9f9f9;
+    width:180px;
+    transition:transform 0.2s, box-shadow 0.2s;
+}
+.letter-box:hover{
+    transform:translateY(-2px);
+    box-shadow:0 4px 12px rgba(0,0,0,0.15);
+}
+
+.letter-header{
+    text-align:center;
+    margin-bottom:10px;
 }
 .letter-img{
-    width:60px;
-    height:60px;
-    border:1px solid #ccc;
-    border-radius:4px;
+    width:80px;
+    height:80px;
+    border:2px solid #ccc;
+    border-radius:6px;
     background:white;
+    display:block;
+    margin:0 auto 8px;
 }
-.confidence{
-    font-size:0.8em;
+
+.top-prediction{
+    font-size:24px;
+    font-weight:700;
+    color:#2575fc;
+    margin:5px 0;
+}
+.top-confidence{
+    font-size:14px;
+    color:#28a745;
+    font-weight:600;
+}
+
+.alternatives{
+    margin-top:12px;
+    padding-top:10px;
+    border-top:1px solid #ddd;
+}
+.alternatives-title{
+    font-size:11px;
     color:#666;
+    font-weight:600;
+    margin-bottom:6px;
+    text-transform:uppercase;
 }
+.alt-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:4px 0;
+    font-size:13px;
+}
+.alt-label{
+    font-weight:600;
+    color:#495057;
+}
+.alt-confidence{
+    color:#6c757d;
+    font-size:12px;
+}
+
+/* Progress bar cho alternatives */
+.alt-bar-container{
+    width:100%;
+    height:4px;
+    background:#e9ecef;
+    border-radius:2px;
+    margin-top:2px;
+    overflow:hidden;
+}
+.alt-bar{
+    height:100%;
+    background:linear-gradient(90deg, #2575fc, #6c757d);
+    border-radius:2px;
+    transition:width 0.3s;
+}
+
 .loading{
     text-align:center;
     color:#2575fc;
@@ -123,17 +191,18 @@ canvas{
 @media (max-width:768px){
     .main-layout{flex-direction:column;}
     .left-panel,.right-panel{max-width:none;}
+    .letter-box{width:150px;}
 }
 
 #stepsList {
     display: grid;
-    grid-template-columns: repeat(5, 1fr); /* 5 ảnh trên 1 hàng */
+    grid-template-columns: repeat(5, 1fr);
     gap: 12px;
     margin-top: 10px;
 }
 
 .step-box {
-    text-align: left; /* căn trái tiêu đề */
+    text-align: left;
     background: #fafafa;
     padding: 6px;
     border-radius: 10px;
@@ -151,12 +220,8 @@ canvas{
     margin-bottom: 4px;
     font-size: 14px;
     font-weight: 600;
-    text-align: left; /* căn trái */
+    text-align: left;
 }
-
-
-
-
 </style>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -179,14 +244,11 @@ canvas{
                     <label style="display:block; margin-bottom:5px; font-weight:600;">Phương pháp phát hiện ký tự:</label>
                     <select id="thresholdMethod" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
                         <option value="otsu">Otsu (Ảnh đồng đều - Tốt nhất)</option>
-                        <option value="combined">Combined (Ánh sáng không đều)</option>
-                        <option value="adaptive">Adaptive (Gradient, bóng đổ)</option>
                         <option value="canny">Canny Edge (Phát hiện biên)</option>
                     </select>
                     <small style="color:#666; font-size:0.85em;">
-                        💡 <b>Otsu:</b> Tốt nhất với ảnh có độ tương phản cao<br>
-                        💡 <b>Adaptive/Combined:</b> Tốt hơn khi có vùng tối/sáng<br>
-                        💡 <b>Canny:</b> Phát hiện biên, tốt với chữ mờ hoặc không rõ
+                         <b>Otsu:</b> Tốt nhất với ảnh có độ tương phản cao<br>
+                         <b>Canny:</b> Phát hiện biên, tốt với chữ mờ hoặc không rõ
                     </small>
                 </div>
 
@@ -209,16 +271,6 @@ canvas{
                     <button class="btn-action" id="processRoiBtn">Xử lý & Dự đoán vùng chọn</button>
                 </div>
             </div>
-
-             <div class="card" id="stepsContainerr" style="display:none;"> 
-                <h3>📌 Các bước xử lý</h3>
-                <div id="stepsListt"></div>
-            </div> 
-
-            <div class="card" id="lettersContainer" style="display:none;">
-                <h3>✉️ Chữ/Số đã tách (<span id="letterCount">0</span>)</h3>
-                <div id="lettersList"></div>
-            </div>
         </div>
 
         <div class="right-panel">
@@ -227,13 +279,19 @@ canvas{
                <canvas id="draw-canvas" width="900" height="600"></canvas>
                <p style="font-size:0.9em; color:#6c757d;">(Vẽ trực tiếp hoặc ảnh upload)</p>
            </div>
-           
         </div>
     </div>
-     <!-- Steps dưới Canvas -->
+    
+    <!-- Steps dưới Canvas -->
     <div class="card" id="stepsContainer" style="display:none; margin-top:16px">
            <h3>📌 Các bước xử lý</h3>
            <div id="stepsList"></div>
+    </div>
+
+    <!-- Letters với Top Predictions -->
+    <div class="card" id="lettersContainer" style="display:none; margin-top:16px">
+        <h3>✉️ Chữ/Số đã tách (<span id="letterCount">0</span>)</h3>
+        <div id="lettersList"></div>
     </div>
 </div>
 
@@ -254,7 +312,7 @@ function switchMode(mode){
         sections[k].style.display = (k === mode) ? 'block' : 'none';
     }
     currentMode = mode;
-    clearResults(); // ✅ Xóa kết quả khi đổi mode
+    clearResults();
 }
 modeButtons.forEach(btn => btn.addEventListener('click', () => switchMode(btn.dataset.mode)));
 document.addEventListener('DOMContentLoaded', () => switchMode('upload'));
@@ -363,7 +421,7 @@ roiInput.addEventListener('change', e => {
             const x = (canvas.width - roiImage.width*scale)/2;
             const y = (canvas.height - roiImage.height*scale)/2;
             ctx.drawImage(roiImage,x,y,roiImage.width*scale,roiImage.height*scale);
-            roiRect = null; // Reset ROI
+            roiRect = null;
         };
         roiImage.src = ev.target.result;
     };
@@ -391,7 +449,6 @@ canvas.addEventListener('mousemove', e => {
         w: Math.abs(x-roiStart.x),
         h: Math.abs(y-roiStart.y)
     };
-    // Vẽ lại ảnh + khung ROI
     clearCanvas();
     const scale = Math.min(canvas.width/roiImage.width, canvas.height/roiImage.height);
     const imgX = (canvas.width - roiImage.width*scale)/2;
@@ -434,7 +491,7 @@ document.getElementById("uploadForm").addEventListener("submit", async e => {
 
     const submitBtn = e.target.querySelector('button[type="submit"]');
     showLoading(submitBtn);
-    clearResults(); // ✅ Xóa kết quả cũ
+    clearResults();
 
     try {
         const formData = new FormData();
@@ -463,7 +520,7 @@ document.getElementById("uploadForm").addEventListener("submit", async e => {
 document.getElementById("processDrawBtn").addEventListener("click", async () => {
     const btn = document.getElementById("processDrawBtn");
     showLoading(btn);
-    clearResults(); // ✅ Xóa kết quả cũ
+    clearResults();
 
     try {
         const base64 = canvas.toDataURL("image/png");
@@ -497,7 +554,7 @@ document.getElementById("processRoiBtn").addEventListener("click", async () => {
 
     const btn = document.getElementById("processRoiBtn");
     showLoading(btn);
-    clearResults(); // ✅ Xóa kết quả cũ
+    clearResults();
 
     try {
         const cropCanvas = document.createElement("canvas");
@@ -543,14 +600,14 @@ function renderSteps(steps){
     box.style.display = "block";
     list.innerHTML = "";
 
-    const timestamp = new Date().getTime(); // ✅ Thêm timestamp để bypass cache
+    const timestamp = new Date().getTime();
 
     steps.forEach(s => {
         list.innerHTML += `
         <div class="step-box">
             <p><b>${s.title}</b></p>
             <img src="/static/${s.file}?t=${timestamp}" class="step-img">
-            </div>
+        </div>
         `;
     });
 }
@@ -566,28 +623,55 @@ function renderLetters(letters, predictions){
 
     const timestamp = new Date().getTime();
     
-    console.log('🔍 Render letters:', letters); // ✅ Debug log
-    console.log('🔍 Timestamp:', timestamp);
+    console.log('🔍 Render letters:', letters);
+    console.log('🔍 Predictions:', predictions);
 
     letters.forEach((filename, i) => {
         const pred = predictions[i];
-        const label = pred.label || pred;
-        const confidence = pred.confidence ? (pred.confidence * 100).toFixed(1) + '%' : '';
+        
+        // Xử lý cả format cũ và mới
+        const topLabel = pred.top_prediction || pred.label || pred;
+        const topConfidence = pred.confidence || 0;
+        const top5 = pred.top_5 || [];
         
         const imgUrl = `/static/letters/${filename}?t=${timestamp}`;
-        console.log(`📷 Loading image: ${imgUrl}`); // ✅ Debug log
         
-        list.innerHTML += `
+        // Tạo HTML cho top prediction
+        let html = `
             <div class="letter-box">
-                <img src="${imgUrl}" class="letter-img" alt="${label}" onerror="console.error('❌ Failed to load:', this.src)">
-                <div style="font-weight:bold; color:#2575fc; margin-top:5px;">${label}</div>
-                ${confidence ? `<div class="confidence">${confidence}</div>` : ''}
-            </div>
-        `;
+                <div class="letter-header">
+                    <img src="${imgUrl}" class="letter-img" alt="${topLabel}">
+                    <div class="top-prediction">${topLabel}</div>
+                    <div class="top-confidence">${(topConfidence * 100).toFixed(1)}%</div>
+                </div>`;
+        
+        // Nếu có top 5, hiển thị alternatives (bỏ qua prediction đầu tiên vì đã hiển thị ở trên)
+        if (top5.length > 1) {
+            html += `
+                <div class="alternatives">
+                    <div class="alternatives-title">Các khả năng khác:</div>`;
+            
+            // Hiển thị từ vị trí thứ 2 đến thứ 5
+            for (let j = 1; j < Math.min(5, top5.length); j++) {
+                const alt = top5[j];
+                const percentage = (alt.confidence * 100).toFixed(1);
+                html += `
+                    <div class="alt-item">
+                        <span class="alt-label">${j}. ${alt.label}</span>
+                        <span class="alt-confidence">${percentage}%</span>
+                    </div>
+                    <div class="alt-bar-container">
+                        <div class="alt-bar" style="width: ${percentage}%"></div>
+                    </div>`;
+            }
+            
+            html += `</div>`;
+        }
+        
+        html += `</div>`;
+        list.innerHTML += html;
     });
 }
-
-
 </script>
 </body>
 </html>
