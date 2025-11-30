@@ -141,7 +141,7 @@ def sort_contours_by_line(contours):
 # --- ROUTES ---
 @app.route("/")
 def index():
-    return render_template("indexcu.html")
+    return render_template("index.html")
 
 @app.route("/process", methods=["POST"])
 def process():
