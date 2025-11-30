@@ -240,10 +240,14 @@ def process():
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
         area = w * h
+        filtered_contours.append((x, y, w, h, cnt))
+        
+        '''
         if area > img_area * 0.01 and area < img_area * 0.8:
             if w > 10 and h > 10:
                 filtered_contours.append((x, y, w, h, cnt))
-    
+        '''
+        
     filtered_contours = sort_contours_by_line(filtered_contours)
     
     img_with_boxes = cv_img.copy()
@@ -266,7 +270,7 @@ def process():
                 if os.path.isfile(file_path):
                     os.unlink(file_path)
             except Exception as e:
-                print(f"⚠️ Không thể xóa {file_path}: {e}")
+                print(f"Không thể xóa {file_path}: {e}")
     else:
         os.makedirs(LETTER_FOLDER, exist_ok=True)
 
@@ -293,8 +297,8 @@ def process():
             "top_5": top_preds  # Danh sách top 5
         })
 
-    print(f"📊 Tổng số ký tự: {len(letters)}")
-    print(f"🎯 Top predictions: {[p['top_prediction'] for p in predictions]}")
+    print(f"Tổng số ký tự: {len(letters)}")
+    print(f"Top predictions: {[p['top_prediction'] for p in predictions]}")
     
     return jsonify({
         "steps": steps,
