@@ -75,8 +75,8 @@ def preprocessing_for_prediction(crop_binary, out_size=(64, 64), pad=10):
     tight_crop = crop_binary[y:y+h, x:x+w]
     
     # 4. Thêm padding
-    pad_h = int(h * 0.3)  # 25% chiều cao
-    pad_w = int(w * 0.3)  # 25% chiều rộng
+    pad_h = int(h * 0.25)  # 25% chiều cao
+    pad_w = int(w * 0.25)  # 25% chiều rộng
     padded = cv2.copyMakeBorder(
         tight_crop, 
         pad_h, pad_h, pad_w, pad_w,
@@ -141,7 +141,7 @@ def sort_contours_by_line(contours):
 # --- ROUTES ---
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("indexcu.html")
 
 @app.route("/process", methods=["POST"])
 def process():
@@ -152,15 +152,11 @@ def process():
     letters = []
     predictions = []
 
-    # ---- Nhận tham số threshold method ----
-    threshold_method = "combined"  # Default
-    
     # ---- Nhận ảnh ----
     if "image" in request.files:
         file = request.files["image"]
         img_bytes = file.read()
         img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        threshold_method = request.form.get("threshold_method", "combined")
     else:
         data = request.get_json()
         if data is None or "image" not in data:
@@ -169,9 +165,8 @@ def process():
         base64_str = data["image"].split(",")[1]
         img_bytes = base64.b64decode(base64_str)
         img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        threshold_method = data.get("threshold_method", "combined")
     
-    print(f"🎯 Phương pháp threshold: {threshold_method}")
+    print(f" Sử dụng Otsu threshold")
 
     # PIL → OpenCV
     cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
@@ -186,51 +181,20 @@ def process():
     cv2.imwrite(f"{STATIC_FOLDER}/step_blur.png", blur)
     steps.append({"title": "Gaussian Blur", "file": "step_blur.png"})
 
-    # ---- Step 3: Threshold ----
+    # ---- Step 3: Threshold (Otsu) ----
     _, th_otsu = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     cv2.imwrite(f"{STATIC_FOLDER}/step_thresh_otsu.png", th_otsu)
     steps.append({"title": "Threshold (Otsu)", "file": "step_thresh_otsu.png"})
     
-    th_adaptive = cv2.adaptiveThreshold(
-        blur, 255, 
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY_INV, 
-        blockSize=21,
-        C=10
-    )
-    cv2.imwrite(f"{STATIC_FOLDER}/step_thresh_adaptive.png", th_adaptive)
-    steps.append({"title": "Threshold (Adaptive)", "file": "step_thresh_adaptive.png"})
-    
-    th_combined = cv2.bitwise_or(th_otsu, th_adaptive)
-    cv2.imwrite(f"{STATIC_FOLDER}/step_thresh_combined.png", th_combined)
-    steps.append({"title": "Threshold (Combined)", "file": "step_thresh_combined.png"})
-    
-    # ---- Step 3.5: Morphology ----
+    # ---- Step 3.5: Morphology để làm sạch ----
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    th_morphed = cv2.morphologyEx(th_combined, cv2.MORPH_CLOSE, kernel, iterations=1)
+    th_morphed = cv2.morphologyEx(th_otsu, cv2.MORPH_CLOSE, kernel, iterations=1)
     th_morphed = cv2.morphologyEx(th_morphed, cv2.MORPH_OPEN, kernel, iterations=1)
     cv2.imwrite(f"{STATIC_FOLDER}/step_morphology.png", th_morphed)
     steps.append({"title": "Morphology (Clean)", "file": "step_morphology.png"})
     
-    # ---- Step 3.6: Canny Edge ----
-    edges = cv2.Canny(blur, threshold1=50, threshold2=150)
-    kernel_canny = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    edges_dilated = cv2.dilate(edges, kernel_canny, iterations=2)
-    edges_closed = cv2.morphologyEx(edges_dilated, cv2.MORPH_CLOSE, kernel_canny, iterations=2)
-    cv2.imwrite(f"{STATIC_FOLDER}/step_canny.png", edges_closed)
-    steps.append({"title": "Canny Edge Detection", "file": "step_canny.png"})
-    
-    # Chọn ảnh threshold
-    if threshold_method == "otsu":
-        th_detect = th_otsu
-    elif threshold_method == "adaptive":
-        th_detect = th_adaptive
-    elif threshold_method == "canny":
-        th_detect = edges_closed
-    else:
-        th_detect = th_morphed
-    
-    th_for_crop = th_otsu
+    # Sử dụng ảnh đã làm sạch để phát hiện và crop
+    th_detect = th_morphed
 
     # ---- Step 4: Tách ký tự ----
     contours, _ = cv2.findContours(th_detect, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -239,15 +203,8 @@ def process():
     img_area = th_detect.shape[0] * th_detect.shape[1]
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
-        area = w * h
         filtered_contours.append((x, y, w, h, cnt))
-        
-        '''
-        if area > img_area * 0.01 and area < img_area * 0.8:
-            if w > 10 and h > 10:
-                filtered_contours.append((x, y, w, h, cnt))
-        '''
-        
+    
     filtered_contours = sort_contours_by_line(filtered_contours)
     
     img_with_boxes = cv_img.copy()
@@ -258,9 +215,6 @@ def process():
     
     cv2.imwrite(f"{STATIC_FOLDER}/step_boxes.png", img_with_boxes)
     steps.append({"title": "Detected Characters", "file": "step_boxes.png"})
-    
-    cv2.imwrite(f"{STATIC_FOLDER}/step_thresh_used.png", th_detect)
-    steps.append({"title": f"Threshold Used ({threshold_method.upper()})", "file": "step_thresh_used.png"})
 
     # ---- Xóa files cũ ----
     if os.path.exists(LETTER_FOLDER):
@@ -270,13 +224,13 @@ def process():
                 if os.path.isfile(file_path):
                     os.unlink(file_path)
             except Exception as e:
-                print(f"Không thể xóa {file_path}: {e}")
+                print(f" Không thể xóa {file_path}: {e}")
     else:
         os.makedirs(LETTER_FOLDER, exist_ok=True)
 
     # ---- Step 5: Xử lý từng ký tự ----
     for idx, (x, y, w, h, cnt) in enumerate(filtered_contours):
-        crop = th_for_crop[y:y+h, x:x+w]
+        crop = th_detect[y:y+h, x:x+w]
         processed = preprocessing_for_prediction(crop)
 
         save_path = os.path.join(LETTER_FOLDER, f"letter_{idx}.png")
@@ -297,8 +251,8 @@ def process():
             "top_5": top_preds  # Danh sách top 5
         })
 
-    print(f"Tổng số ký tự: {len(letters)}")
-    print(f"Top predictions: {[p['top_prediction'] for p in predictions]}")
+    print(f" Tổng số ký tự: {len(letters)}")
+    print(f" Top predictions: {[p['top_prediction'] for p in predictions]}")
     
     return jsonify({
         "steps": steps,

@@ -227,7 +227,7 @@ canvas{
 </head>
 <body>
 <div class="container">
-    <h1>Creative Image Recognition Tool</h1>
+    <h1> Creative Image Recognition Tool</h1>
 
     <div class="mode-buttons">
         <button data-mode="upload">Upload Image</button>
@@ -238,65 +238,49 @@ canvas{
     <div class="main-layout">
         <div class="left-panel">
             <div class="card">
-                <h3>Tham số & Xử lý</h3>
-
-                <div style="margin-bottom:15px;">
-                    <label style="display:block; margin-bottom:5px; font-weight:600;">Phương pháp phát hiện ký tự:</label>
-                    <select id="thresholdMethod" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                        <option value="otsu">Otsu (Ảnh đồng đều - Tốt nhất)</option>
-                        <option value="canny">Canny Edge (Phát hiện biên)</option>
-                    </select>
-                    <small style="color:#666; font-size:0.85em;">
-                         <b>Otsu:</b> Tốt nhất với ảnh có độ tương phản cao<br>
-                         <b>Canny:</b> Phát hiện biên, tốt với chữ mờ hoặc không rõ
-                    </small>
-                </div>
+                <h3> Tham số và Xử lý</h3>
 
                 <div class="mode-section" id="uploadSection">
                     <form id="uploadForm" enctype="multipart/form-data">
                         <input type="file" id="imageInput" name="image" accept="image/*" style="width:100%; margin-bottom:10px;"><br>
-                        <button type="submit" class="btn-action">Xử lý & Dự đoán</button>
+                        <button type="submit" class="btn-action">Xử lý và Dự đoán</button>
                     </form>
                 </div>
 
                 <div class="mode-section" id="drawSection">
                     <p>Vẽ trực tiếp trên canvas</p>
                     <button class="btn-action" id="clearDrawBtn">Xóa Canvas</button>
-                    <button class="btn-action" id="processDrawBtn">Xử lý & Dự đoán</button>
+                    <button class="btn-action" id="processDrawBtn">Xử lý và Dự đoán</button>
                 </div>
 
                 <div class="mode-section" id="roiSection">
-                    <p>Upload ảnh & chọn vùng ROI</p>
+                    <p> Upload ảnh và chọn vùng ROI</p>
                     <input type="file" id="roiImageInput" accept="image/*" style="width:100%; margin-bottom:10px;">
-                    <button class="btn-action" id="processRoiBtn">Xử lý & Dự đoán vùng chọn</button>
+                    <button class="btn-action" id="processRoiBtn">Xử lý và Dự đoán vùng chọn</button>
                 </div>
             </div>
         </div>
 
         <div class="right-panel">
            <div class="card">
-               <h3>Canvas Hiển thị / Vẽ trực tiếp</h3>
+               <h3> Canvas Hiển thị / Vẽ trực tiếp</h3>
                <canvas id="draw-canvas" width="900" height="600"></canvas>
                <p style="font-size:0.9em; color:#6c757d;">(Vẽ trực tiếp hoặc ảnh upload)</p>
            </div>
         </div>
-       
     </div>
-    </div>
-     <div class="card" id="lettersContainer" style="display:none; margin-top:16px">
-        <h3>✉️ Chữ/Số đã tách (<span id="letterCount">0</span>)</h3>
-        <div id="lettersList"></div>
+    
     <!-- Steps dưới Canvas -->
     <div class="card" id="stepsContainer" style="display:none; margin-top:16px">
            <h3> Các bước xử lý</h3>
            <div id="stepsList"></div>
     </div>
 
-    <!-- Letters với Top Predictions
+    <!-- Letters với Top Predictions -->
     <div class="card" id="lettersContainer" style="display:none; margin-top:16px">
         <h3>✉️ Chữ/Số đã tách (<span id="letterCount">0</span>)</h3>
         <div id="lettersList"></div>
-    </div> -->
+    </div>
 </div>
 
 <script>
@@ -470,7 +454,7 @@ canvas.addEventListener('mouseleave', ()=>roiDrawing=false);
 // --- Loading indicator ---
 function showLoading(button) {
     button.disabled = true;
-    button.textContent = 'Đang xử lý...';
+    button.textContent = '⏳ Đang xử lý...';
 }
 
 function hideLoading(button, text) {
@@ -500,7 +484,6 @@ document.getElementById("uploadForm").addEventListener("submit", async e => {
     try {
         const formData = new FormData();
         formData.append("image", file);
-        formData.append("threshold_method", document.getElementById('thresholdMethod').value);
 
         const res = await fetch("/process", {
             method: "POST",
@@ -534,8 +517,7 @@ document.getElementById("processDrawBtn").addEventListener("click", async () => 
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 mode: "draw",
-                image: base64,
-                threshold_method: document.getElementById('thresholdMethod').value
+                image: base64
             })
         });
         const data = await res.json();
@@ -579,8 +561,7 @@ document.getElementById("processRoiBtn").addEventListener("click", async () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 mode: "roi",
-                image: base64,
-                threshold_method: document.getElementById('thresholdMethod').value
+                image: base64
             })
         });
         const data = await res.json();
@@ -627,8 +608,8 @@ function renderLetters(letters, predictions){
 
     const timestamp = new Date().getTime();
     
-    console.log('Render letters:', letters);
-    console.log('Predictions:', predictions);
+    console.log(' Render letters:', letters);
+    console.log(' Predictions:', predictions);
 
     letters.forEach((filename, i) => {
         const pred = predictions[i];
