@@ -227,7 +227,7 @@ canvas{
 </head>
 <body>
 <div class="container">
-    <h1>✨ Creative Image Recognition Tool</h1>
+    <h1>Creative Image Recognition Tool</h1>
 
     <div class="mode-buttons">
         <button data-mode="upload">Upload Image</button>
@@ -266,7 +266,7 @@ canvas{
                 </div>
 
                 <div class="mode-section" id="roiSection">
-                    <p>📌 Upload ảnh & chọn vùng ROI</p>
+                    <p>Upload ảnh & chọn vùng ROI</p>
                     <input type="file" id="roiImageInput" accept="image/*" style="width:100%; margin-bottom:10px;">
                     <button class="btn-action" id="processRoiBtn">Xử lý & Dự đoán vùng chọn</button>
                 </div>
@@ -275,7 +275,7 @@ canvas{
 
         <div class="right-panel">
            <div class="card">
-               <h3>🖼️ Canvas Hiển thị / Vẽ trực tiếp</h3>
+               <h3>Canvas Hiển thị / Vẽ trực tiếp</h3>
                <canvas id="draw-canvas" width="900" height="600"></canvas>
                <p style="font-size:0.9em; color:#6c757d;">(Vẽ trực tiếp hoặc ảnh upload)</p>
            </div>
@@ -470,7 +470,7 @@ canvas.addEventListener('mouseleave', ()=>roiDrawing=false);
 // --- Loading indicator ---
 function showLoading(button) {
     button.disabled = true;
-    button.textContent = '⏳ Đang xử lý...';
+    button.textContent = 'Đang xử lý...';
 }
 
 function hideLoading(button, text) {
@@ -627,8 +627,8 @@ function renderLetters(letters, predictions){
 
     const timestamp = new Date().getTime();
     
-    console.log('🔍 Render letters:', letters);
-    console.log('🔍 Predictions:', predictions);
+    console.log('Render letters:', letters);
+    console.log('Predictions:', predictions);
 
     letters.forEach((filename, i) => {
         const pred = predictions[i];
